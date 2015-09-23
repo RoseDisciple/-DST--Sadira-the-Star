@@ -50,7 +50,30 @@ local function onbecamehuman(inst)
 	inst.components.locomotor.walkspeed = 5
 	inst.components.locomotor.runspeed = 7
 end
+local function updatestats(inst)
+	if inst.sg:HasStateTag("nomorph") or
+		inst:HasTag("playerghost") or
+		inst.components.health:IsDead() then
+		return
+	end
+	
+	local sanitypercent = inst.components.sanity:GetPercent()
+	if TheWorld.state.isday then
+		inst.Light:Enable(false)
+	elseif TheWorld.state.isdusk then
+		inst.Light:Enable(false)
+	elseif TheWorld.state.isnight then
+		if sanitypercent >= 0.5 then
+			inst.Light:Enable(true)
+		else
+			inst.Light:Enable(false)
+		end
+	end
+end
 
+local function onsanitydelta(inst, data)
+	updatestats(inst)
+end
 -- When loading or spawning the character
 local function onload(inst)
     inst:ListenForEvent("ms_respawnedfromghost", onbecamehuman)
@@ -121,6 +144,27 @@ local master_postinit = function(inst)
 	
 	inst.OnLoad = onload
     inst.OnNewSpawn = onload
+	
+	-- Night Vision
+	local light = inst.entity:AddLight()
+	inst.Light:Enable(false)
+    inst.Light:SetIntensity(.85)
+    inst.Light:SetColour(197 / 255, 197 / 255, 50 / 255)
+    inst.Light:SetFalloff(0.3)
+    inst.Light:SetRadius(5)
+	
+	inst:WatchWorldState("daytime", function(inst) updatestats(inst) end , TheWorld)
+	inst:WatchWorldState("dusktime", function(inst) updatestats(inst) end , TheWorld)
+	inst:WatchWorldState("nighttime", function(inst) updatestats(inst) end , TheWorld)
+	updatestats(inst)
+	
+	inst:ListenForEvent("sanitydelta", onsanitydelta)
+	
+	inst.OnSave = onsave
+	inst.OnPreload = onpreload
+	inst.OnLoad = onload
+	
+	return inst
 end
 
 return MakePlayerCharacter("sadira", prefabs, assets, common_postinit, master_postinit, start_inv)
